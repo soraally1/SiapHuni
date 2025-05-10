@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { getUserGeneratedDesigns, deleteGeneratedDesign, GeneratedDesign } from '@/services/designService';
+import { createConsultation } from '@/services/consultationService';
 import { useRouter } from 'next/navigation';
-import { FiHome, FiTrash2, FiEye, FiLoader } from 'react-icons/fi';
+import { FiHome, FiTrash2, FiEye, FiLoader, FiMessageSquare } from 'react-icons/fi';
 import Navbar from '@/components/Navbar';
 
 export default function SavedDesignsPage() {
@@ -15,6 +16,7 @@ export default function SavedDesignsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [consultingId, setConsultingId] = useState<string | null>(null);
 
   // Load saved designs when user auth state is ready
   useEffect(() => {
@@ -71,6 +73,28 @@ export default function SavedDesignsPage() {
 
   const handleViewDesign = (designId: string) => {
     router.push(`/Profile/saved-designs/${designId}`);
+  };
+
+  const handleConsultArchitect = async (design: GeneratedDesign) => {
+    if (!user || !design.id) return;
+    
+    setConsultingId(design.id);
+    
+    try {
+      const result = await createConsultation(user.uid, design.id, design);
+      
+      if (result.success) {
+        // Redirect to the consultation chat page
+        router.push(`/Profile/consultations/${result.consultationId}`);
+      } else {
+        throw new Error(result.error || 'Gagal membuat permintaan konsultasi');
+      }
+    } catch (err) {
+      console.error('Error creating consultation:', err);
+      alert('Gagal membuat permintaan konsultasi. Silakan coba lagi.');
+    } finally {
+      setConsultingId(null);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -130,13 +154,26 @@ export default function SavedDesignsPage() {
                     Dibuat pada: {formatDate(design.createdAt)}
                   </p>
                   
-                  <div className="flex items-center justify-between mt-4">
+                  <div className="flex items-center justify-between gap-2 mt-4 flex-wrap">
                     <button
                       onClick={() => handleViewDesign(design.id!)}
                       className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
                     >
                       <FiEye className="mr-1" />
                       Detail
+                    </button>
+                    
+                    <button
+                      onClick={() => handleConsultArchitect(design)}
+                      disabled={consultingId === design.id}
+                      className="flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                    >
+                      {consultingId === design.id ? (
+                        <FiLoader className="animate-spin mr-1" />
+                      ) : (
+                        <FiMessageSquare className="mr-1" />
+                      )}
+                      Konsultasi
                     </button>
                     
                     <button

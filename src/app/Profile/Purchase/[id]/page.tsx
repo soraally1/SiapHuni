@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/firebase';
 import Navbar from '@/components/Navbar';
 import {
   FileText,
@@ -20,6 +20,7 @@ import {
   Clock,
   AlertCircle
 } from 'lucide-react';
+import { createSupportThread } from '@/services/supportService';
 
 interface FirestoreMaterial {
   name: string;
@@ -76,6 +77,7 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
   const [purchase, setPurchase] = useState<PurchaseDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [supportLoading, setSupportLoading] = useState(false);
 
   useEffect(() => {
     const loadPurchaseDetails = async () => {
@@ -176,6 +178,40 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleContactSupport = async () => {
+    if (!user || !purchase) return;
+    
+    try {
+      setSupportLoading(true);
+      
+      // Get user name from appropriate properties
+      const userName = user.displayName || 
+                       (user.email ? user.email.split('@')[0] : 'User');
+      
+      // Create a support thread for this purchased house
+      const { success, threadId, error: supportError } = await createSupportThread(
+        user.uid,
+        userName,
+        user.email || '',
+        `Support Request: ${purchase.houseName}`,
+        `I need help with my purchased house "${purchase.houseName}" (Purchase ID: ${purchase.id})`,
+        purchase.houseId
+      );
+      
+      if (success && threadId) {
+        // Redirect to the support thread
+        router.push(`/support/${threadId}`);
+      } else {
+        setError(supportError || 'Failed to create support thread');
+      }
+    } catch (err) {
+      console.error('Error creating support thread:', err);
+      setError('An unexpected error occurred while contacting support');
+    } finally {
+      setSupportLoading(false);
+    }
   };
 
   if (loading) {
@@ -413,8 +449,12 @@ export default function PurchaseDetailPage({ params }: { params: Promise<{ id: s
                 <p className="text-gray-600 mb-4">
                   Tim support kami siap membantu Anda dengan pertanyaan seputar material dan konstruksi
                 </p>
-                <button className="w-full py-3 bg-[#594C1A] text-white rounded-xl font-medium hover:bg-[#938656] transition-colors">
-                  Hubungi Support
+                <button 
+                  onClick={handleContactSupport}
+                  disabled={supportLoading}
+                  className="w-full py-3 bg-[#594C1A] text-white rounded-xl font-medium hover:bg-[#938656] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {supportLoading ? 'Memproses...' : 'Hubungi Support'}
                 </button>
               </motion.div>
             </div>

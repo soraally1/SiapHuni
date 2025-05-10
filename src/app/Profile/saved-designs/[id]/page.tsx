@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { getGeneratedDesign, GeneratedDesign } from '@/services/designService';
+import { createConsultation } from '@/services/consultationService';
 import { useRouter } from 'next/navigation';
-import { FiArrowLeft, FiLoader, FiHome, FiDollarSign, FiFeather, FiCheck, FiLayers } from 'react-icons/fi';
+import { FiArrowLeft, FiLoader, FiHome, FiDollarSign, FiFeather, FiCheck, FiLayers, FiMessageSquare } from 'react-icons/fi';
 import Navbar from '@/components/Navbar';
 
 export default function DesignDetailPage({ params }: { params: { id: string } }) {
@@ -15,6 +16,8 @@ export default function DesignDetailPage({ params }: { params: { id: string } })
   const [design, setDesign] = useState<GeneratedDesign | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [consultLoading, setConsultLoading] = useState(false);
+  const [consultError, setConsultError] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -43,6 +46,29 @@ export default function DesignDetailPage({ params }: { params: { id: string } })
       setError('Terjadi kesalahan saat mengambil data desain');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConsultArchitect = async () => {
+    if (!user || !design) return;
+    
+    setConsultLoading(true);
+    setConsultError(null);
+    
+    try {
+      const result = await createConsultation(user.uid, designId, design);
+      
+      if (result.success) {
+        // Redirect to the consultation chat page
+        router.push(`/Profile/consultations/${result.consultationId}`);
+      } else {
+        setConsultError(result.error || 'Gagal membuat permintaan konsultasi');
+      }
+    } catch (err) {
+      console.error('Error creating consultation:', err);
+      setConsultError('Terjadi kesalahan saat membuat permintaan konsultasi');
+    } finally {
+      setConsultLoading(false);
     }
   };
 
@@ -81,7 +107,29 @@ export default function DesignDetailPage({ params }: { params: { id: string } })
         ) : design ? (
           <div className="bg-white shadow-md rounded-lg overflow-hidden">
             <div className="p-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">{design.name}</h1>
+              <div className="flex justify-between items-center mb-4">
+                <h1 className="text-3xl font-bold text-gray-900">{design.name}</h1>
+                
+                <button
+                  onClick={handleConsultArchitect}
+                  disabled={consultLoading}
+                  className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                >
+                  {consultLoading ? (
+                    <FiLoader className="animate-spin mr-2" />
+                  ) : (
+                    <FiMessageSquare className="mr-2" />
+                  )}
+                  Konsultasi dengan Arsitek
+                </button>
+              </div>
+              
+              {consultError && (
+                <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg mb-4">
+                  {consultError}
+                </div>
+              )}
+              
               <p className="text-gray-600 mb-6">Gaya: {design.style}</p>
               
               <div className="mb-6">

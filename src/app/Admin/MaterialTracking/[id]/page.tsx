@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { getAuth } from 'firebase/auth';
 import { isAdmin } from '@/services/adminService';
 import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/firebase';
 import Link from 'next/link';
 import { 
   ChevronLeft,

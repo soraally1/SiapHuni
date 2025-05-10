@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, getDoc, doc } from 'firebase/firestore';
 import { isAdmin, setUserAsAdmin, removeUserAsAdmin } from '@/services/adminService';
 import { useRouter } from 'next/navigation';
 import { app, db } from '@/firebase';
@@ -61,10 +61,20 @@ export default function UserManagement() {
       const snapshot = await getDocs(q);
 
       const userData: User[] = [];
-      for (const doc of snapshot.docs) {
-        const data = doc.data();
-        const userId = doc.id;
-        const adminStatus = await isAdmin(userId);
+      for (const docSnapshot of snapshot.docs) {
+        const data = docSnapshot.data();
+        const userId = docSnapshot.id;
+        
+        // Check if user is admin either by isAdmin flag or role="admin"
+        let adminStatus = data.isAdmin === true || data.role === "admin";
+        
+        // Also check users collection for role="admin"
+        if (!adminStatus) {
+          const userDoc = await getDoc(doc(db, 'users', userId));
+          if (userDoc.exists() && userDoc.data().role === "admin") {
+            adminStatus = true;
+          }
+        }
 
         userData.push({
           id: userId,
@@ -110,6 +120,26 @@ export default function UserManagement() {
     } catch (error) {
       console.error('Error updating admin status:', error);
       alert('Failed to update admin status');
+    } finally {
+      setProcessingUser(null);
+    }
+  };
+
+  const handleSetUserRole = async (userId: string, role: "admin" | "user") => {
+    try {
+      setProcessingUser(userId);
+      
+      if (role === "admin") {
+        await setUserAsAdmin(userId);
+      } else {
+        await removeUserAsAdmin(userId);
+      }
+      
+      // Refresh the users list
+      fetchUsers();
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      alert('Failed to update user role');
     } finally {
       setProcessingUser(null);
     }
@@ -205,19 +235,23 @@ export default function UserManagement() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => toggleAdminStatus(user.id, !user.isAdmin)}
-                          disabled={processingUser === user.id}
-                          className={`text-amber-600 hover:text-amber-900 ${
-                            processingUser === user.id ? 'opacity-50 cursor-not-allowed' : ''
-                          }`}
-                        >
-                          {processingUser === user.id 
-                            ? 'Memproses...' 
-                            : user.isAdmin 
-                              ? 'Cabut Hak Admin' 
-                              : 'Jadikan Admin'}
-                        </button>
+                        <div className="flex space-x-2">
+                          {user.isAdmin ? (
+                            <button
+                              onClick={() => handleSetUserRole(user.id, "user")}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              Remove Admin
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleSetUserRole(user.id, "admin")}
+                              className="text-green-600 hover:text-green-900"
+                            >
+                              Make Admin
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
